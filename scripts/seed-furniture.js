@@ -1,3 +1,5 @@
+const path = require('path');
+const dotenv = require('dotenv');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const User = require('../src/models/User.model');
@@ -6,10 +8,16 @@ const Furniture = require('../src/models/Furniture.model');
 const FurnitureOrder = require('../src/models/FurnitureOrder.model');
 const FurnitureChangeRequest = require('../src/models/FurnitureChangeRequest.model');
 
-const MONGO_URI = 'mongodb://localhost:27017/immosmart-pfe';
+dotenv.config({ path: path.join(__dirname, '../.env') });
+
+const { MONGO_URI } = process.env;
 
 async function seed() {
   try {
+    if (!MONGO_URI) {
+      throw new Error('MONGO_URI is missing from backend/.env');
+    }
+
     await mongoose.connect(MONGO_URI);
     console.log('Connected to MongoDB');
 
