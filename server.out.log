@@ -1,0 +1,7 @@
+
+> backend-pfe@1.0.0 start
+> node src/app.js
+
+✅ Connected to MongoDB
+🚀 Server running on port 5000
+[0mGET /api/properties [32m200[0m 64.848 ms - 1211079[0m
