@@ -32,33 +32,25 @@ const ensureEmailConfig = () => {
 const createTransporter = () => {
   ensureEmailConfig();
 
-  const transportOptions = smtpConfig.service
-    ? {
-        service: smtpConfig.service,
-        auth: {
-          user: smtpConfig.user,
-          pass: smtpConfig.pass,
-        },
-      }
-    : {
-        host: smtpConfig.host,
-        port: smtpConfig.port,
-        secure: smtpConfig.secure,
-        auth: {
-          user: smtpConfig.user,
-          pass: smtpConfig.pass,
-        },
-      };
-
-  if (smtpConfig.ignoreTlsErrors) {
-    transportOptions.tls = { rejectUnauthorized: false };
-  }
-
-  // Force IPv4 to avoid ENETUNREACH errors on Render/IPv6 networks
-  transportOptions.family = 4;
+  // On utilise la configuration manuelle plutôt que le mode "service" 
+  // pour mieux contrôler la connexion IPv4
+  const transportOptions = {
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false, // false pour le port 587
+    auth: {
+      user: smtpConfig.user,
+      pass: smtpConfig.pass,
+    },
+    family: 4, // FORCER IPv4
+    tls: {
+      rejectUnauthorized: false
+    }
+  };
 
   return nodemailer.createTransport(transportOptions);
 };
+
 
 const transporter = createTransporter();
 let verificationPromise = null;
