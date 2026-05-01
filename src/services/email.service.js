@@ -1,18 +1,98 @@
+require('../config/env');
 const nodemailer = require('nodemailer');
-const jwt = require('jsonwebtoken');
 
-const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587,
-  secure: false, // use TLS
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-  tls: {
-    rejectUnauthorized: false // Helps in some environments
+const parseBoolean = (value, defaultValue = false) => {
+  if (value === undefined || value === null || value === '') return defaultValue;
+  return ['1', 'true', 'yes', 'on'].includes(String(value).toLowerCase());
+};
+
+const parsePort = (value, fallback) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const smtpConfig = {
+  service: process.env.SMTP_SERVICE || undefined,
+  host: process.env.SMTP_HOST || 'smtp.gmail.com',
+  port: parsePort(process.env.SMTP_PORT, 587),
+  secure: parseBoolean(process.env.SMTP_SECURE, false),
+  user: process.env.SMTP_USER,
+  pass: process.env.SMTP_PASS,
+  from: process.env.EMAIL_FROM || process.env.SMTP_USER,
+  ignoreTlsErrors: parseBoolean(process.env.SMTP_TLS_REJECT_UNAUTHORIZED, false) === false,
+};
+
+const ensureEmailConfig = () => {
+  const missing = ['SMTP_USER', 'SMTP_PASS'].filter((key) => !process.env[key]);
+  if (missing.length > 0) {
+    throw new Error(`Email configuration incomplete: missing ${missing.join(', ')}`);
   }
-});
+};
+
+const createTransporter = () => {
+  ensureEmailConfig();
+
+  const transportOptions = smtpConfig.service
+    ? {
+        service: smtpConfig.service,
+        auth: {
+          user: smtpConfig.user,
+          pass: smtpConfig.pass,
+        },
+      }
+    : {
+        host: smtpConfig.host,
+        port: smtpConfig.port,
+        secure: smtpConfig.secure,
+        auth: {
+          user: smtpConfig.user,
+          pass: smtpConfig.pass,
+        },
+      };
+
+  if (smtpConfig.ignoreTlsErrors) {
+    transportOptions.tls = { rejectUnauthorized: false };
+  }
+
+  // Force IPv4 to avoid ENETUNREACH errors on Render/IPv6 networks
+  transportOptions.family = 4;
+
+  return nodemailer.createTransport(transportOptions);
+};
+
+const transporter = createTransporter();
+let verificationPromise = null;
+
+const verifyTransporter = async () => {
+  if (!verificationPromise) {
+    verificationPromise = transporter
+      .verify()
+      .then(() => {
+        console.log(
+          `[email] SMTP ready via ${smtpConfig.service || `${smtpConfig.host}:${smtpConfig.port}`}`,
+        );
+      })
+      .catch((error) => {
+        verificationPromise = null;
+        throw error;
+      });
+  }
+
+  return verificationPromise;
+};
+
+const formatFromAddress = () => {
+  if (!smtpConfig.from) return undefined;
+  return smtpConfig.from.includes('<') ? smtpConfig.from : `ImmoSmart <${smtpConfig.from}>`;
+};
+
+const logDeliveryResult = (info) => {
+  const accepted = Array.isArray(info.accepted) ? info.accepted.join(', ') : '';
+  const rejected = Array.isArray(info.rejected) ? info.rejected.join(', ') : '';
+  console.log(
+    `[email] messageId=${info.messageId || 'n/a'} accepted=${accepted || 'none'} rejected=${rejected || 'none'} response=${info.response || 'n/a'}`,
+  );
+};
 
 /**
  * Send an email
@@ -20,151 +100,144 @@ const transporter = nodemailer.createTransport({
  * @param {string} subject
  * @param {string} text
  * @param {string} html
- * @returns {Promise}
+ * @returns {Promise<import('nodemailer/lib/smtp-transport').SentMessageInfo>}
  */
 const sendEmail = async (to, subject, text, html) => {
-  const msg = { from: process.env.EMAIL_FROM, to, subject, text, html };
-  await transporter.sendMail(msg);
+  await verifyTransporter();
+
+  const msg = {
+    from: formatFromAddress(),
+    to,
+    subject,
+    text,
+    html,
+    replyTo: smtpConfig.from || smtpConfig.user,
+  };
+
+  const info = await transporter.sendMail(msg);
+  logDeliveryResult(info);
+  return info;
 };
 
 /**
- * Send verification email with JWT
+ * Send verification email
  * @param {string} to
  * @param {string} code
- * @returns {Promise}
+ * @returns {Promise<import('nodemailer/lib/smtp-transport').SentMessageInfo>}
  */
 const sendVerificationEmail = async (to, code) => {
-  const subject = 'Vérification de votre compte ImmoSmart';
-  const text = `Bonjour,\n\nMerci de vous être inscrit sur ImmoSmart. Votre code de vérification est : ${code}\n\nCe code expirera dans 24 heures.`;
+  const subject = 'Verification de votre compte ImmoSmart';
+  const text = `Bonjour,\n\nMerci de vous etre inscrit sur ImmoSmart. Votre code de verification est : ${code}\n\nCe code expirera dans 24 heures.`;
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 10px;">
       <h2 style="color: #2EC4C7; text-align: center;">Bienvenue sur ImmoSmart</h2>
       <p>Bonjour,</p>
-      <p>Merci de vous être inscrit sur notre plateforme. Pour finaliser la création de votre compte, veuillez utiliser le code de vérification suivant :</p>
-      
+      <p>Merci de vous etre inscrit sur notre plateforme. Pour finaliser la creation de votre compte, veuillez utiliser le code de verification suivant :</p>
       <div style="background: #f3f4f6; padding: 30px; text-align: center; border-radius: 12px; margin: 30px 0; border: 1.5px dashed #2EC4C7;">
-        <p style="margin: 0 0 10px; font-size: 14px; color: #6b7280; font-weight: 600;">VOTRE CODE DE VÉRIFICATION</p>
+        <p style="margin: 0 0 10px; font-size: 14px; color: #6b7280; font-weight: 600;">VOTRE CODE DE VERIFICATION</p>
         <span style="font-size: 42px; font-weight: 800; letter-spacing: 10px; color: #111827;">${code}</span>
       </div>
-      
       <p>Ce code est valable pendant <strong>24 heures</strong>.</p>
-      <p>Si vous n'avez pas créé de compte, vous pouvez ignorer cet email en toute sécurité.</p>
+      <p>Si vous n'avez pas cree de compte, vous pouvez ignorer cet email en toute securite.</p>
       <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
-      <p style="font-size: 12px; color: #6b7280; text-align: center;">&copy; 2024 ImmoSmart. Tous droits réservés.</p>
+      <p style="font-size: 12px; color: #6b7280; text-align: center;">&copy; 2026 ImmoSmart. Tous droits reserves.</p>
     </div>
   `;
 
-  // Log to terminal for convenience
   console.log('---------------------------------------------------------');
   console.log(`[VERIFICATION CODE] Account: ${to} | CODE: ${code}`);
   console.log('---------------------------------------------------------');
 
-  try {
-    await sendEmail(to, subject, text, html);
-  } catch (error) {
-    console.error(`[SMTP ERROR]:`, error.message);
-  }
+  return sendEmail(to, subject, text, html);
 };
 
 /**
  * Send reset password email
  * @param {string} to
  * @param {string} code
- * @returns {Promise}
+ * @returns {Promise<import('nodemailer/lib/smtp-transport').SentMessageInfo>}
  */
 const sendResetPasswordEmail = async (to, code) => {
-  const subject = 'Réinitialisation de votre mot de passe ImmoSmart';
-  const text = `Bonjour,\n\nVous avez demandé la réinitialisation de votre mot de passe. Votre code de récupération est : ${code}\n\nCe code expirera dans 15 minutes.`;
+  const subject = 'Reinitialisation de votre mot de passe ImmoSmart';
+  const text = `Bonjour,\n\nVous avez demande la reinitialisation de votre mot de passe. Votre code de recuperation est : ${code}\n\nCe code expirera dans 15 minutes.`;
   const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; borderRadius: 10px;">
-      <h2 style="color: #F27D72; textAlign: center;">Réinitialisation de mot de passe</h2>
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 10px;">
+      <h2 style="color: #F27D72; text-align: center;">Reinitialisation de mot de passe</h2>
       <p>Bonjour,</p>
-      <p>Nous avons reçu une demande de réinitialisation de mot de passe pour votre compte. Veuillez utiliser le code suivant pour procéder :</p>
-      <div style="background: #fef2f2; padding: 20px; textAlign: center; borderRadius: 8px; margin: 20px 0;">
+      <p>Nous avons recu une demande de reinitialisation de mot de passe pour votre compte. Veuillez utiliser le code suivant pour proceder :</p>
+      <div style="background: #fef2f2; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0;">
         <span style="font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #dc2626;">${code}</span>
       </div>
       <p>Ce code est valable pendant <strong>15 minutes</strong>.</p>
-      <p>Si vous n'avez pas demandé cette réinitialisation, veuillez ignorer cet email.</p>
-      <hr style="border: 0; borderTop: 1px solid #e5e7eb; margin: 20px 0;" />
-      <p style="font-size: 12px; color: #6b7280; textAlign: center;">&copy; 2024 ImmoSmart. Tous droits réservés.</p>
+      <p>Si vous n'avez pas demande cette reinitialisation, veuillez ignorer cet email.</p>
+      <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
+      <p style="font-size: 12px; color: #6b7280; text-align: center;">&copy; 2026 ImmoSmart. Tous droits reserves.</p>
     </div>
   `;
-  
-  try {
-    await sendEmail(to, subject, text, html);
-  } catch (error) {
-    console.error(`[SMTP ERROR]:`, error.message);
-  }
+
+  return sendEmail(to, subject, text, html);
 };
 
 /**
  * Send contract notification email
  * @param {string} to
  * @param {object} contractData
- * @returns {Promise}
+ * @returns {Promise<import('nodemailer/lib/smtp-transport').SentMessageInfo>}
  */
 const sendContractEmail = async (to, contractData) => {
-  const subject = 'Contrat de location à signer - ImmoSmart';
-  const text = `Bonjour,\n\nLe propriétaire a signé et envoyé le contrat de location pour le bien "${contractData.propertyTitle}". Veuillez vous connecter à votre compte ImmoSmart pour le consulter et le signer.\n\nCordialement,\nL'équipe ImmoSmart`;
+  const subject = 'Contrat de location a signer - ImmoSmart';
+  const text = `Bonjour,\n\nLe proprietaire a signe et envoye le contrat de location pour le bien "${contractData.propertyTitle}". Veuillez vous connecter a votre compte ImmoSmart pour le consulter et le signer.\n\nCordialement,\nL'equipe ImmoSmart`;
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 10px;">
-      <h2 style="color: #2EC4C7; text-align: center;">Contrat de location à signer</h2>
+      <h2 style="color: #2EC4C7; text-align: center;">Contrat de location a signer</h2>
       <p>Bonjour,</p>
-      <p>Le propriétaire a signé et envoyé le contrat de location pour le bien suivant :</p>
+      <p>Le proprietaire a signe et envoye le contrat de location pour le bien suivant :</p>
       <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
         <h3 style="margin: 0 0 10px; color: #111827;">${contractData.propertyTitle}</h3>
         <p style="margin: 0; color: #6b7280;">${contractData.propertyAddress}</p>
-        <p style="margin: 10px 0 0; font-weight: bold;">Loyer: ${contractData.rent}€/mois</p>
+        <p style="margin: 10px 0 0; font-weight: bold;">Loyer: ${contractData.rent} EUR/mois</p>
       </div>
-      <p>Veuillez vous connecter à votre compte ImmoSmart pour consulter le contrat et le signer.</p>
+      <p>Veuillez vous connecter a votre compte ImmoSmart pour consulter le contrat et le signer.</p>
       <div style="text-align: center; margin: 30px 0;">
-        <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/tenant/dashboard" style="background: #2EC4C7; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Accéder à mon compte</a>
+        <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/tenant/dashboard" style="background: #2EC4C7; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Acceder a mon compte</a>
       </div>
       <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
-      <p style="font-size: 12px; color: #6b7280; text-align: center;">&copy; 2024 ImmoSmart. Tous droits réservés.</p>
+      <p style="font-size: 12px; color: #6b7280; text-align: center;">&copy; 2026 ImmoSmart. Tous droits reserves.</p>
     </div>
   `;
-  
-  try {
-    await sendEmail(to, subject, text, html);
-  } catch (error) {
-    console.error(`[SMTP ERROR]:`, error.message);
-  }
+
+  return sendEmail(to, subject, text, html);
 };
 
 /**
  * Send contract signed notification email
  * @param {string} to
  * @param {object} contractData
- * @returns {Promise}
+ * @returns {Promise<import('nodemailer/lib/smtp-transport').SentMessageInfo>}
  */
 const sendContractSignedEmail = async (to, contractData) => {
-  const subject = 'Contrat signé par le locataire - ImmoSmart';
-  const text = `Bonjour,\n\nLe locataire a signé le contrat de location pour le bien "${contractData.propertyTitle}". Vous pouvez maintenant l'activer dans votre compte ImmoSmart.\n\nCordialement,\nL'équipe ImmoSmart`;
+  const subject = 'Contrat signe par le locataire - ImmoSmart';
+  const text = `Bonjour,\n\nLe locataire a signe le contrat de location pour le bien "${contractData.propertyTitle}". Vous pouvez maintenant l'activer dans votre compte ImmoSmart.\n\nCordialement,\nL'equipe ImmoSmart`;
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 10px;">
-      <h2 style="color: #2EC4C7; text-align: center;">Contrat signé par le locataire</h2>
+      <h2 style="color: #2EC4C7; text-align: center;">Contrat signe par le locataire</h2>
       <p>Bonjour,</p>
-      <p>Le locataire a signé le contrat de location pour le bien suivant :</p>
+      <p>Le locataire a signe le contrat de location pour le bien suivant :</p>
       <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
         <h3 style="margin: 0 0 10px; color: #111827;">${contractData.propertyTitle}</h3>
         <p style="margin: 0; color: #6b7280;">${contractData.propertyAddress}</p>
-        <p style="margin: 10px 0 0; font-weight: bold;">Loyer: ${contractData.rent}€/mois</p>
+        <p style="margin: 10px 0 0; font-weight: bold;">Loyer: ${contractData.rent} EUR/mois</p>
       </div>
       <p>Vous pouvez maintenant activer le contrat dans votre compte ImmoSmart.</p>
       <div style="text-align: center; margin: 30px 0;">
-        <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/owner/dashboard" style="background: #2EC4C7; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Accéder à mon compte</a>
+        <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/owner/dashboard" style="background: #2EC4C7; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Acceder a mon compte</a>
       </div>
       <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
-      <p style="font-size: 12px; color: #6b7280; text-align: center;">&copy; 2024 ImmoSmart. Tous droits réservés.</p>
+      <p style="font-size: 12px; color: #6b7280; text-align: center;">&copy; 2026 ImmoSmart. Tous droits reserves.</p>
     </div>
   `;
-  
-  try {
-    await sendEmail(to, subject, text, html);
-  } catch (error) {
-    console.error(`[SMTP ERROR]:`, error.message);
-  }
+
+  return sendEmail(to, subject, text, html);
 };
 
 module.exports = {
@@ -173,4 +246,5 @@ module.exports = {
   sendResetPasswordEmail,
   sendContractEmail,
   sendContractSignedEmail,
+  verifyTransporter,
 };

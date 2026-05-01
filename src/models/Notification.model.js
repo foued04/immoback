@@ -1,5 +1,15 @@
 const mongoose = require('mongoose');
 
+const NOTIFICATION_TYPES = [
+  'R\u00e9clamation',
+  'Contrat',
+  'Syst\u00e8me',
+  'V\u00e9rification',
+  'Mobilier',
+];
+
+const NOTIFICATION_STATUSES = ['Vue par le propri\u00e9taire', 'En attente'];
+
 const NotificationSchema = new mongoose.Schema({
   recipient: {
     type: mongoose.Schema.Types.ObjectId,

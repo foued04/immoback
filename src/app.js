@@ -34,6 +34,31 @@ app.use(morgan('dev'));
 // Heartbeat route
 app.get('/', (req, res) => res.send('API Running'));
 
+// Diagnostic Route for Email
+app.get('/api/test-email', async (req, res) => {
+  const emailService = require('./services/email.service');
+  try {
+    const info = await emailService.sendEmail(
+      process.env.SMTP_USER,
+      'Test Render Email',
+      'Ceci est un test depuis Render.',
+      '<h1>Test Render</h1>'
+    );
+    res.send({ success: true, messageId: info.messageId, response: info.response });
+  } catch (error) {
+    res.status(500).send({ 
+      success: false, 
+      error: error.message, 
+      stack: error.stack,
+      env_check: {
+        user: process.env.SMTP_USER ? 'OK' : 'MISSING',
+        pass: process.env.SMTP_PASS ? 'OK' : 'MISSING',
+        service: process.env.SMTP_SERVICE || 'none'
+      }
+    });
+  }
+});
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/properties', propertyRoutes);

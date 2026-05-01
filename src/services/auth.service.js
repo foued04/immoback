@@ -28,16 +28,20 @@ const createUser = async (userData) => {
     isEmailVerified: false,
   });
 
-  // Send verification email
+  let emailDelivery = { delivered: false };
   try {
     await emailService.sendVerificationEmail(user.email, verificationCode);
+    emailDelivery = { delivered: true };
   } catch (error) {
     console.error('Failed to send verification email:', error);
-    // Don't throw error here, user is created but email failed. 
-    // They can request a resend later if we implement it.
+    emailDelivery = {
+      delivered: false,
+      message: "Le compte a ete cree, mais l'email de verification n'a pas pu etre envoye.",
+      error: error.message,
+    };
   }
 
-  return user;
+  return { user, verificationCode, emailDelivery };
 };
 
 const loginUserWithEmailAndPassword = async (email, password) => {
@@ -97,6 +101,43 @@ const verifyEmail = async (email, code) => {
   await user.save();
   
   return true;
+};
+
+const resendVerificationCode = async (email) => {
+  const user = await User.findOne({ email });
+  if (!user) {
+    throw new ApiError(404, 'Aucun utilisateur trouve avec cette adresse email');
+  }
+
+  if (user.isEmailVerified) {
+    throw new ApiError(400, 'Cette adresse email est deja verifiee');
+  }
+
+  const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+  user.verificationCode = verificationCode;
+  user.verificationCodeExpires = Date.now() + 24 * 60 * 60 * 1000;
+  await user.save();
+
+  try {
+    await emailService.sendVerificationEmail(user.email, verificationCode);
+    return {
+      verificationCode,
+      emailDelivery: {
+        delivered: true,
+        message: 'Un nouveau code de verification a ete envoye.',
+      },
+    };
+  } catch (error) {
+    console.error('Failed to resend verification email:', error);
+    return {
+      verificationCode,
+      emailDelivery: {
+        delivered: false,
+        message: "Impossible d'envoyer l'email de verification pour le moment.",
+        error: error.message,
+      },
+    };
+  }
 };
 
 const verifyResetCode = async (email, code) => {
@@ -171,6 +212,7 @@ module.exports = {
   verifyResetCode,
   resetPassword,
   verifyEmail,
+  resendVerificationCode,
   updateUser,
   updatePassword,
 };

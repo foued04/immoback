@@ -8,13 +8,16 @@ const { OAuth2Client } = require('google-auth-library');
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const signup = asyncHandler(async (req, res) => {
-  const user = await authService.createUser(req.body);
+  const { user, emailDelivery } = await authService.createUser(req.body);
   const accessToken = tokenService.generateAuthToken(user);
-  // Include verificationCode in response for testing/development
-  res.status(201).send({ 
-    user, 
-    accessToken, 
-    devCode: user.verificationCode // Add this for the user to see in their browser
+
+  res.status(emailDelivery.delivered ? 201 : 202).send({
+    user,
+    accessToken,
+    message: emailDelivery.delivered
+      ? 'Compte cree. Un code de verification a ete envoye par email.'
+      : `${emailDelivery.message} ${emailDelivery.error ? `Detail SMTP: ${emailDelivery.error}` : ''}`.trim(),
+    emailDelivered: emailDelivery.delivered,
   });
 });
 
@@ -215,6 +218,18 @@ const verifyEmail = asyncHandler(async (req, res) => {
   });
 });
 
+const resendVerificationEmail = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  const { emailDelivery } = await authService.resendVerificationCode(email);
+
+  res.send({
+    message: emailDelivery.delivered
+      ? emailDelivery.message
+      : `${emailDelivery.message} ${emailDelivery.error ? `Detail SMTP: ${emailDelivery.error}` : ''}`.trim(),
+    emailDelivered: emailDelivery.delivered,
+  });
+});
+
 module.exports = {
   signup,
   login,
@@ -226,4 +241,5 @@ module.exports = {
   updateProfile,
   updatePassword,
   verifyEmail,
+  resendVerificationEmail,
 };

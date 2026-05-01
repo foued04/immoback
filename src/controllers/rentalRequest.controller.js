@@ -17,18 +17,16 @@ const createRequest = asyncHandler(async (req, res) => {
 
 const getRequests = asyncHandler(async (req, res) => {
   const filter = {};
-  
+
   if (req.user.role === 'owner') {
-    // For owners, we need to filter requests for properties they own
-    // This is better done with a more complex query or finding propertyIds first
     const Property = require('../models/Property.model');
     const ownerProperties = await Property.find({ owner: req.user._id }).select('_id');
-    const propertyIds = ownerProperties.map(p => p._id);
+    const propertyIds = ownerProperties.map((property) => property._id);
     filter.property = { $in: propertyIds };
   } else if (req.user.role === 'tenant') {
     filter.tenant = req.user._id;
   }
-  
+
   const result = await rentalRequestService.queryRentalRequests(filter);
   res.send(result);
 });
@@ -38,31 +36,31 @@ const updateRequestStatus = asyncHandler(async (req, res) => {
   const requestId = req.params.requestId;
 
   const request = await rentalRequestService.getRentalRequestById(requestId);
-  
-  // Authorization: Only owner of the property can update status
+
   if (request.property.owner.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
     throw new ApiError(403, 'Forbidden');
   }
 
   const updatedRequest = await rentalRequestService.updateRentalRequestStatus(requestId, status);
 
-  // Mirror owner decision in discussion thread for this request.
   const conversation = await Conversation.findOne({
     contextId: String(requestId),
     participants: req.user._id,
   }).sort({ updatedAt: -1 });
 
+  const normalizedStatus = String(status || '').toLowerCase();
+
   if (conversation) {
-    const normalizedStatus = String(status || '').toLowerCase();
     let ownerMessage = null;
+
     if (normalizedStatus.includes('accept')) {
-      ownerMessage = "Votre demande a ete acceptee.";
+      ownerMessage = 'Votre demande a ete acceptee.';
     } else if (normalizedStatus.includes('refus')) {
-      ownerMessage = "Votre demande a ete refusee.";
+      ownerMessage = 'Votre demande a ete refusee.';
     } else if (normalizedStatus.includes('gen') || normalizedStatus.includes('gener')) {
-      ownerMessage = "Le contrat a ete genere et est pret a etre consulte.";
+      ownerMessage = 'Le contrat a ete genere et est pret a etre consulte.';
     } else if (normalizedStatus.includes('actif') || normalizedStatus.includes('active')) {
-      ownerMessage = "Le contrat est desormais actif.";
+      ownerMessage = 'Le contrat est desormais actif.';
     }
 
     if (ownerMessage) {
@@ -85,7 +83,6 @@ const updateRequestStatus = asyncHandler(async (req, res) => {
 
   const tenantId = request.tenant?._id || request.tenant;
   const propertyTitle = request.property?.title || 'votre logement';
-  const normalizedStatus = String(status || '').toLowerCase();
   let notificationTitle = null;
   let notificationPreview = null;
   let notificationContent = null;
@@ -101,20 +98,29 @@ const updateRequestStatus = asyncHandler(async (req, res) => {
   }
 
   if (tenantId && notificationTitle) {
-    await Notification.create({
+    const notificationPayload = {
       recipient: tenantId,
-      type: 'Système',
+      type: 'SystÃ¨me',
       title: notificationTitle,
       preview: notificationPreview,
       content: notificationContent,
       status: 'En attente',
       isRead: false,
-    });
+    };
+
+    if (conversation) {
+      notificationPayload.messageMeta = {
+        conversationId: conversation._id.toString(),
+        senderId: req.user._id.toString(),
+        senderName: req.user.fullName || 'Proprietaire',
+        contextId: String(requestId),
+      };
+    }
+
+    await Notification.create(notificationPayload);
   }
-  
-  // When an owner accepts a request, the property is no longer available.
-  // Keep the later contract-active transition covered as well.
-  if (normalizedStatus.includes('accept') || status === "Contrat actif") {
+
+  if (normalizedStatus.includes('accept') || status === 'Contrat actif') {
     const propertyService = require('../services/property.service');
     await propertyService.updatePropertyById(request.property._id, { status: 'rented' });
   }
@@ -125,7 +131,7 @@ const updateRequestStatus = asyncHandler(async (req, res) => {
 const deleteRequest = asyncHandler(async (req, res) => {
   const requestId = req.params.requestId;
   const request = await rentalRequestService.getRentalRequestById(requestId);
-  
+
   if (request.tenant._id.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
     throw new ApiError(403, 'Forbidden');
   }
