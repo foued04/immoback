@@ -33,9 +33,7 @@ const createTransporter = () => {
   ensureEmailConfig();
 
   const transportOptions = {
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true,
+    service: 'gmail',
     auth: {
       user: smtpConfig.user,
       pass: smtpConfig.pass,
