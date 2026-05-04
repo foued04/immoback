@@ -76,9 +76,10 @@ app.use('/api/housing-needs', housingNeedRoutes);
 // Error Handler
 app.use(errorHandler);
 
-// Database and Server
-connectDB().then(() => {
-  app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-  });
+// Start Server immediately (Important for Render)
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  
+  // Connect to Database in background
+  connectDB();
 });
