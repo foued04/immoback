@@ -107,24 +107,28 @@ const sendMessage = asyncHandler(async (req, res) => {
     .filter((participantId) => participantId && participantId !== asStringId(req.user._id));
 
   await Promise.all(
-    recipients.map((participantId) =>
-      Notification.create({
-        recipient: participantId,
-        type: 'Système',
-        title: 'Nouveau message',
-        preview: `${req.user.fullName || 'Un utilisateur'} vous a envoye un message.`,
-        content: messageContent.length > 160 ? `${messageContent.slice(0, 157)}...` : messageContent,
-        status: 'En attente',
-        isRead: false,
-        messageMeta: {
-          conversationId: conversation._id.toString(),
-          messageId: message._id.toString(),
-          senderId: req.user._id.toString(),
-          senderName: req.user.fullName || 'Utilisateur',
-          contextId: conversation.contextId || '',
-        },
+      recipients.map(async (participantId) => {
+        try {
+          await Notification.create({
+            recipient: participantId,
+            type: 'Systeme',
+            title: 'Nouveau message',
+            preview: `${req.user.fullName || 'Un utilisateur'} vous a envoy\u00e9 un message.`,
+            content: messageContent.length > 160 ? `${messageContent.slice(0, 157)}...` : messageContent,
+            status: 'En attente',
+            isRead: false,
+            messageMeta: {
+              conversationId: conversation._id.toString(),
+              messageId: message._id.toString(),
+              senderId: req.user._id.toString(),
+              senderName: req.user.fullName || 'Utilisateur',
+              contextId: conversation.contextId || '',
+            },
+          });
+        } catch (error) {
+          console.error('Error creating notification for participant:', error);
+        }
       })
-    )
   );
   
   res.status(201).send(message);

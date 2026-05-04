@@ -4,6 +4,7 @@ const propertySchema = new mongoose.Schema({
   title: { type: String, required: true },
   description: { type: String, required: true },
   city: { type: String, required: true },
+  department: { type: String },
   address: { type: String, required: true },
   rent: { type: Number, required: true },
   deposit: { type: Number, required: true },
@@ -73,7 +74,9 @@ const propertySchema = new mongoose.Schema({
       description: { type: String }
     }]
   },
-  meuble: { type: Boolean, default: false }
+  meuble: { type: Boolean, default: false },
+  lat: { type: Number },
+  lng: { type: Number }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Property', propertySchema);

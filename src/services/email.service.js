@@ -32,17 +32,15 @@ const ensureEmailConfig = () => {
 const createTransporter = () => {
   ensureEmailConfig();
 
-  // On utilise la configuration manuelle plutôt que le mode "service" 
-  // pour mieux contrôler la connexion IPv4
   const transportOptions = {
     host: 'smtp.gmail.com',
-    port: 587,
-    secure: false, // false pour le port 587
+    port: 465,
+    secure: true,
     auth: {
       user: smtpConfig.user,
       pass: smtpConfig.pass,
     },
-    family: 4, // FORCER IPv4
+    family: 4, // Force IPv4 pour éviter les erreurs ENETUNREACH sur Render
     tls: {
       rejectUnauthorized: false
     }
@@ -95,8 +93,6 @@ const logDeliveryResult = (info) => {
  * @returns {Promise<import('nodemailer/lib/smtp-transport').SentMessageInfo>}
  */
 const sendEmail = async (to, subject, text, html) => {
-  await verifyTransporter();
-
   const msg = {
     from: formatFromAddress(),
     to,

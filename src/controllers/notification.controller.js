@@ -22,14 +22,19 @@ exports.markAsRead = asyncHandler(async (req, res) => {
 
 exports.createNotification = asyncHandler(async (req, res) => {
   const { recipient, type, title, preview, content, claimResponse, attachments, claimMeta, contractData } = req.body;
-  const normalizedType =
-    type === 'RÃ©clamation'
-      ? 'Réclamation'
-      : type === 'SystÃ¨me'
-        ? 'Système'
-        : type === 'VÃ©rification'
-          ? 'Vérification'
-          : type;
+  
+  // Normalize type to handle potential encoding issues from various sources
+  let normalizedType = type;
+  if (type) {
+    const isMangledReclamation = type.includes('R\u00c3\u00a9') || type.includes('R\u00e9');
+    const isMangledSystem = type.includes('Syst\u00c3\u00a8') || type.includes('Syst\u00e8');
+    const isMangledVerification = type.includes('V\u00c3\u00a9') || type.includes('V\u00e9');
+
+    if (isMangledReclamation) normalizedType = 'Reclamation';
+    else if (isMangledSystem) normalizedType = 'Systeme';
+    else if (isMangledVerification) normalizedType = 'Verification';
+  }
+
   const normalizedAttachments = Array.isArray(attachments)
     ? attachments
         .map((item) => {

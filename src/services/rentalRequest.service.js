@@ -49,17 +49,26 @@ const createRentalRequest = async (requestBody) => {
   conversation.lastMessage = message._id;
   await conversation.save();
 
-  // Create notification for the owner
-  const Notification = require('../models/Notification.model');
-  await Notification.create({
-    recipient: property.owner,
-    type: 'Système',
-    title: 'Nouvelle demande de location',
-    preview: `Une nouvelle demande pour "${property.title}" est arrivée.`,
-    content: `Le locataire a envoyé une demande pour le bien situé à ${property.address}. Loyer: ${property.rent} TND.`,
-    status: 'En attente',
-    isRead: false
-  });
+  try {
+    const Notification = require('../models/Notification.model');
+    await Notification.create({
+      recipient: property.owner,
+      type: 'Systeme',
+      title: 'Nouvelle demande de location',
+      preview: `Une nouvelle demande pour "${property.title}" est arriv\u00e9e.`,
+      content: `Le locataire a envoy\u00e9 une demande pour le bien situ\u00e9 \u00e0 ${property.address}. Loyer: ${property.rent} TND.`,
+      status: 'En attente',
+      isRead: false,
+      requestMeta: {
+        requestId: rentalRequest._id.toString(),
+        tenantId: rentalRequest.tenant.toString(),
+        propertyId: property._id.toString(),
+        propertyTitle: property.title
+      }
+    });
+  } catch (error) {
+    console.error('Error creating notification in service:', error);
+  }
 
   return rentalRequest;
 };

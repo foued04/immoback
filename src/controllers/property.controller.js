@@ -28,8 +28,10 @@ const getProperties = asyncHandler(async (req, res) => {
     filter.moderationStatus = 'approved';
     filter.status = 'available';
   } else if (req.user.role === 'owner') {
-    // Owner: see their own properties
-    filter.owner = req.user._id;
+    // Owner: see all properties in the catalog
+    if (req.query.scope === 'mine') {
+      filter.owner = req.user._id;
+    }
   } else if (req.user.role === 'tenant') {
     // Tenant: only show approved properties that are still available
     filter.moderationStatus = 'approved';
@@ -48,9 +50,23 @@ const getProperties = asyncHandler(async (req, res) => {
 
     return res.send(result.map((property) => {
       const propertyObject = property.toObject ? property.toObject() : property;
-      return rentedPropertyIds.has(propertyObject._id.toString())
-        ? { ...propertyObject, status: 'rented' }
-        : propertyObject;
+      const propertyOwnerId = propertyObject.owner?._id || propertyObject.owner;
+      const isOwnedByRequester =
+        propertyOwnerId && propertyOwnerId.toString() === req.user._id.toString();
+
+      // Ensure owner info is accessible in a consistent way
+      const ownerInfo = typeof propertyObject.owner === 'object' ? propertyObject.owner : {};
+      
+      const enhancedProperty = {
+        ...propertyObject,
+        ownerName: ownerInfo.fullName || 'Propriétaire',
+        ownerPhone: ownerInfo.phone || '-',
+        ownerEmail: ownerInfo.email || '-',
+      };
+
+      return isOwnedByRequester && rentedPropertyIds.has(propertyObject._id.toString())
+        ? { ...enhancedProperty, status: 'rented' }
+        : enhancedProperty;
     }));
   }
 

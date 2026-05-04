@@ -1,7 +1,7 @@
 const HousingNeed = require('../models/HousingNeed.model');
 const Notification = require('../models/Notification.model');
 
-const SYSTEM_TYPE = 'Syst\u00e8me';
+const SYSTEM_TYPE = 'Systeme';
 
 const normalize = (value) => String(value || '').trim().toLowerCase();
 

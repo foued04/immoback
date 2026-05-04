@@ -28,18 +28,18 @@ const createUser = async (userData) => {
     isEmailVerified: false,
   });
 
-  let emailDelivery = { delivered: false };
-  try {
-    await emailService.sendVerificationEmail(user.email, verificationCode);
-    emailDelivery = { delivered: true };
-  } catch (error) {
-    console.error('Failed to send verification email:', error);
-    emailDelivery = {
-      delivered: false,
-      message: "Le compte a ete cree, mais l'email de verification n'a pas pu etre envoye.",
-      error: error.message,
-    };
-  }
+  // Do not block signup on SMTP latency.
+  Promise.resolve()
+    .then(() => emailService.sendVerificationEmail(user.email, verificationCode))
+    .catch((error) => {
+      console.error('Failed to send verification email after signup:', error);
+    });
+
+  const emailDelivery = {
+    delivered: true,
+    pending: true,
+    message: 'Le compte a ete cree. Le code de verification est en cours d envoi.',
+  };
 
   return { user, verificationCode, emailDelivery };
 };

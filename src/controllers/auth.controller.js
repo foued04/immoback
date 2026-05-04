@@ -15,7 +15,7 @@ const signup = asyncHandler(async (req, res) => {
     user,
     accessToken,
     message: emailDelivery.delivered
-      ? 'Compte cree. Un code de verification a ete envoye par email.'
+      ? emailDelivery.message || 'Compte cree. Un code de verification a ete envoye par email.'
       : `${emailDelivery.message} ${emailDelivery.error ? `Detail SMTP: ${emailDelivery.error}` : ''}`.trim(),
     emailDelivered: emailDelivery.delivered,
   });

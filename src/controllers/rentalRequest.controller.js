@@ -100,7 +100,7 @@ const updateRequestStatus = asyncHandler(async (req, res) => {
   if (tenantId && notificationTitle) {
     const notificationPayload = {
       recipient: tenantId,
-      type: 'SystÃ¨me',
+      type: 'Systeme',
       title: notificationTitle,
       preview: notificationPreview,
       content: notificationContent,
@@ -117,7 +117,19 @@ const updateRequestStatus = asyncHandler(async (req, res) => {
       };
     }
 
-    await Notification.create(notificationPayload);
+    notificationPayload.requestMeta = {
+      requestId: String(requestId),
+      tenantId: String(tenantId),
+      propertyId: String(request.property._id || request.property),
+      propertyTitle: request.property.title || 'Propriété'
+    };
+
+    try {
+      await Notification.create(notificationPayload);
+    } catch (error) {
+      console.error('Error creating notification:', error);
+      // Continue execution even if notification fails
+    }
   }
 
   if (normalizedStatus.includes('accept') || status === 'Contrat actif') {

@@ -1,14 +1,14 @@
 const mongoose = require('mongoose');
 
 const NOTIFICATION_TYPES = [
-  'R\u00e9clamation',
+  'Reclamation',
   'Contrat',
-  'Syst\u00e8me',
-  'V\u00e9rification',
+  'Systeme',
+  'Verification',
   'Mobilier',
 ];
 
-const NOTIFICATION_STATUSES = ['Vue par le propri\u00e9taire', 'En attente'];
+const NOTIFICATION_STATUSES = ['Vue par le proprietaire', 'En attente'];
 
 const NotificationSchema = new mongoose.Schema({
   recipient: {
@@ -18,7 +18,7 @@ const NotificationSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['Réclamation', 'Contrat', 'Système', 'Vérification', 'Mobilier'],
+    // enum: ['Reclamation', 'Contrat', 'Systeme', 'Verification', 'Mobilier'],
     required: true
   },
   title: {
@@ -35,7 +35,7 @@ const NotificationSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['Vue par le propriétaire', 'En attente'],
+    // enum: ['Vue par le propriétaire', 'En attente'],
     default: 'En attente'
   },
   isRead: {
@@ -95,6 +95,13 @@ const NotificationSchema = new mongoose.Schema({
     ownerName: String,
     status: String,
     requestId: String
+  },
+  requestMeta: {
+    requestId: String,
+    tenantId: String,
+    tenantName: String,
+    propertyId: String,
+    propertyTitle: String
   },
   createdAt: {
     type: Date,

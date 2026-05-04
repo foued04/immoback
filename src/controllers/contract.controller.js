@@ -263,7 +263,7 @@ const sendBackToOwner = asyncHandler(async (req, res) => {
   }
 
   const updatedContract = await contractService.updateContract(contractId, { 
-    status: 'SignedByTenant' 
+    status: 'SignedByBoth' 
   });
 
   await markContractAsRented(updatedContract);
