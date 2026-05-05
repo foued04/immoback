@@ -31,6 +31,14 @@ const getRequests = asyncHandler(async (req, res) => {
   res.send(result);
 });
 
+const getRequest = asyncHandler(async (req, res) => {
+  const request = await rentalRequestService.getRentalRequestById(req.params.requestId);
+  if (!request) {
+    throw new ApiError(404, 'Rental request not found');
+  }
+  res.send(request);
+});
+
 const updateRequestStatus = asyncHandler(async (req, res) => {
   const { status } = req.body;
   const requestId = req.params.requestId;
@@ -155,6 +163,7 @@ const deleteRequest = asyncHandler(async (req, res) => {
 module.exports = {
   createRequest,
   getRequests,
+  getRequest,
   updateRequestStatus,
   deleteRequest,
 };

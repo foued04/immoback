@@ -52,7 +52,8 @@ const generateContract = asyncHandler(async (req, res) => {
   const contract = await contractService.createContract(contractBody);
   await rentalRequestService.updateRentalRequestStatus(requestId, 'Contrat généré');
   
-  res.status(201).send(contract);
+  const populated = await contractService.getContractById(contract._id);
+  res.status(201).send(populated);
 });
 
 // @desc    Récupérer un contrat par l'ID de la demande

@@ -57,7 +57,12 @@ exports.createNotification = asyncHandler(async (req, res) => {
     contractData
   });
   await notification.save();
+  
+  const { emitToUser } = require('../services/socket.service');
+  emitToUser(recipient, 'new_notification', notification);
+  
   res.status(201).json(notification);
+
 });
 
 exports.getUnreadCount = asyncHandler(async (req, res) => {

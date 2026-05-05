@@ -53,7 +53,8 @@ const createProperty = async (propertyBody) => {
 const queryProperties = async (filter = {}) => {
   const properties = await Property.find(filter)
     .sort({ createdAt: -1 })
-    .populate('owner', 'fullName email phone');
+    .populate('owner', 'fullName email phone')
+    .lean();
   return properties;
 };
 

@@ -17,7 +17,14 @@ const chatbotRoutes = require('./routes/chatbot.routes');
 const housingNeedRoutes = require('./routes/housingNeed.routes');
 const { errorHandler } = require('./middlewares/error.middleware');
 
+const http = require('http');
+const { initSocket } = require('./services/socket.service');
+
 const app = express();
+const server = http.createServer(app);
+
+// Initialize Socket.io
+initSocket(server);
 
 // Middlewares
 app.use(helmet());
@@ -77,9 +84,10 @@ app.use('/api/housing-needs', housingNeedRoutes);
 app.use(errorHandler);
 
 // Start Server immediately (Important for Render)
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   
   // Connect to Database in background
   connectDB();
 });
+

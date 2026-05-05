@@ -51,6 +51,9 @@ const createRentalRequest = async (requestBody) => {
 
   try {
     const Notification = require('../models/Notification.model');
+    const User = require('../models/User.model');
+    const tenantUser = await User.findById(requestBody.tenant);
+    
     await Notification.create({
       recipient: property.owner,
       type: 'Systeme',
@@ -61,7 +64,8 @@ const createRentalRequest = async (requestBody) => {
       isRead: false,
       requestMeta: {
         requestId: rentalRequest._id.toString(),
-        tenantId: rentalRequest.tenant.toString(),
+        tenantId: requestBody.tenant.toString(),
+        tenantName: tenantUser?.fullName || 'Un locataire',
         propertyId: property._id.toString(),
         propertyTitle: property.title
       }

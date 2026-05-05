@@ -131,7 +131,20 @@ const sendMessage = asyncHandler(async (req, res) => {
       })
   );
   
+  const { emitToUser } = require('../services/socket.service');
+  recipients.forEach(participantId => {
+    emitToUser(participantId, 'new_message', {
+      ...message.toObject(),
+      sender: {
+        _id: req.user._id,
+        fullName: req.user.fullName,
+        role: req.user.role
+      }
+    });
+  });
+  
   res.status(201).send(message);
+
 });
 
 const getConversationByContext = asyncHandler(async (req, res) => {

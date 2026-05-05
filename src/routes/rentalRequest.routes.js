@@ -11,6 +11,7 @@ router
 
 router
   .route('/:requestId')
+  .get(auth, rentalRequestController.getRequest)
   .delete(auth, rentalRequestController.deleteRequest);
 
 router
