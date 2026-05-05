@@ -2,7 +2,15 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const Property = require('../models/Property.model');
 const RentalRequest = require('../models/RentalRequest.model');
 
-const CHATBOT_MODELS = ['gemini-1.5-flash', 'gemini-1.5-pro'];
+const DEFAULT_CHATBOT_MODELS = [
+  'gemini-2.0-flash',
+  'gemini-2.0-flash-lite',
+  'gemini-1.5-flash',
+];
+
+const CHATBOT_MODELS = process.env.GEMINI_MODEL
+  ? [process.env.GEMINI_MODEL]
+  : DEFAULT_CHATBOT_MODELS;
 
 const getSystemContext = async (user) => {
   const stats = {
@@ -73,7 +81,7 @@ const buildFriendlyChatbotError = (error) => {
   }
 
   if (message.includes('not found') || message.includes('404') || message.includes('model')) {
-    return "Le modele Gemini configure n'est pas disponible pour cette cle API. Verifiez le modele et la configuration du compte.";
+    return "Le modele Gemini configure n'est pas disponible pour cette cle API. Essayez gemini-2.0-flash ou verifiez GEMINI_MODEL et la configuration du compte.";
   }
 
   if (message.includes('fetch') || message.includes('network') || message.includes('timeout') || message.includes('unavailable')) {
