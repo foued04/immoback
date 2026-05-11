@@ -33,7 +33,17 @@ const upsertMyHousingNeed = asyncHandler(async (req, res) => {
   });
 });
 
+const getAllHousingNeeds = asyncHandler(async (req, res) => {
+  if (req.user.role !== 'admin') {
+    throw new ApiError(403, 'Seul l\'administrateur peut consulter tous les besoins logement');
+  }
+
+  const needs = await housingNeedService.getAllHousingNeeds();
+  res.send(needs);
+});
+
 module.exports = {
   getMyHousingNeed,
   upsertMyHousingNeed,
+  getAllHousingNeeds,
 };

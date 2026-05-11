@@ -1,5 +1,6 @@
 const HousingNeed = require('../models/HousingNeed.model');
 const Notification = require('../models/Notification.model');
+const User = require('../models/User.model');
 
 const SYSTEM_TYPE = 'Systeme';
 
@@ -177,11 +178,45 @@ const upsertHousingNeed = async (tenantId, payload) => {
     throw error;
   }
 
-  return HousingNeed.findOneAndUpdate(
+  const need = await HousingNeed.findOneAndUpdate(
     { tenant: tenantId },
     { $set: normalizedPayload },
     { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
-  );
+  ).populate('tenant', 'fullName firstName lastName');
+
+  // Notify Admins
+  try {
+    const tenantName = need.tenant.fullName || `${need.tenant.firstName} ${need.tenant.lastName}`.trim() || 'Un locataire';
+    const admins = await User.find({ role: 'admin' });
+
+    for (const admin of admins) {
+      await Notification.create({
+        recipient: admin._id,
+        type: SYSTEM_TYPE,
+        title: 'Nouveau besoin logement soumis',
+        preview: `${tenantName} recherche un logement a ${normalizedPayload.desiredCity}.`,
+        content: [
+          `Le locataire ${tenantName} a soumis un nouveau besoin logement.`,
+          `Lieu: ${normalizedPayload.desiredCity}${normalizedPayload.department ? `, ${normalizedPayload.department}` : ''}.`,
+          `Type: ${normalizedPayload.propertyType || 'Non precise'}.`,
+          `Budget: ${normalizedPayload.minBudget || 0} - ${normalizedPayload.maxBudget || 'Illimite'} TND.`,
+          `Date d'entree: ${normalizedPayload.moveInDate || 'Non precise'}.`,
+        ].join('\n'),
+        requestMeta: {
+          tenantId: tenantId.toString(),
+          tenantName: tenantName,
+        }
+      });
+    }
+  } catch (err) {
+    console.error('Error notifying admins about housing need:', err);
+  }
+
+  return need;
+};
+
+const getAllHousingNeeds = async () => {
+  return HousingNeed.find().populate('tenant', 'fullName email phone').sort({ updatedAt: -1 });
 };
 
 const notifyMatchingHousingNeedsForProperty = async (property) => {
@@ -208,4 +243,5 @@ module.exports = {
   notifyMatchingHousingNeedsForProperty,
   propertyMatchesNeed,
   upsertHousingNeed,
+  getAllHousingNeeds,
 };

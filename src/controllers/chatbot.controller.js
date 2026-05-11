@@ -3,13 +3,17 @@ const Property = require('../models/Property.model');
 const RentalRequest = require('../models/RentalRequest.model');
 
 const DEFAULT_CHATBOT_MODELS = [
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
   'gemini-2.0-flash',
   'gemini-2.0-flash-lite',
   'gemini-1.5-flash',
 ];
 
 const CHATBOT_MODELS = process.env.GEMINI_MODEL
-  ? [process.env.GEMINI_MODEL]
+  ? process.env.GEMINI_MODEL.split(',')
+    .map((modelName) => modelName.trim())
+    .filter(Boolean)
   : DEFAULT_CHATBOT_MODELS;
 
 const getSystemContext = async (user) => {
@@ -76,12 +80,21 @@ const buildFriendlyChatbotError = (error) => {
     return "Le service IA a atteint sa limite d'utilisation. Reessayez plus tard ou verifiez le quota Gemini.";
   }
 
+  if (
+    message.includes('503') ||
+    message.includes('service unavailable') ||
+    message.includes('high demand') ||
+    message.includes('overloaded')
+  ) {
+    return "Le service IA est temporairement sature, veuillez reessayer.";
+  }
+
   if (message.includes('permission denied') || message.includes('forbidden') || message.includes('access')) {
     return "Le serveur n'a pas acces au modele Gemini configure. Verifiez les droits de la cle API.";
   }
 
   if (message.includes('not found') || message.includes('404') || message.includes('model')) {
-    return "Le modele Gemini configure n'est pas disponible pour cette cle API. Essayez gemini-2.0-flash ou verifiez GEMINI_MODEL et la configuration du compte.";
+    return "Le modele Gemini configure n'est pas disponible pour cette cle API. Essayez gemini-2.5-flash ou verifiez GEMINI_MODEL et la configuration du compte.";
   }
 
   if (message.includes('fetch') || message.includes('network') || message.includes('timeout') || message.includes('unavailable')) {

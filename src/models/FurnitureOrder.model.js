@@ -23,8 +23,10 @@ const furnitureOrderSchema = new mongoose.Schema({
   items: [{
     furniture: { type: mongoose.Schema.Types.ObjectId, ref: 'Furniture' },
     name: { type: String },
+    category: { type: String },
     quantity: { type: Number, default: 1 },
-    price: { type: Number }
+    price: { type: Number },
+    image: { type: String }
   }],
   total: { type: Number, required: true },
   paymentMethod: { type: String, default: 'cash' },
