@@ -1,6 +1,13 @@
 const User = require('../models/User.model');
 const Property = require('../models/Property.model');
 const RentalRequest = require('../models/RentalRequest.model');
+const HousingNeed = require('../models/HousingNeed.model');
+const Notification = require('../models/Notification.model');
+const Message = require('../models/Message.model');
+const Conversation = require('../models/Conversation.model');
+const Contract = require('../models/Contract.model');
+const FurnitureChangeRequest = require('../models/FurnitureChangeRequest.model');
+const FurnitureOrder = require('../models/FurnitureOrder.model');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 
@@ -191,13 +198,63 @@ const updateUser = asyncHandler(async (req, res) => {
  * DELETE /api/users/:id
  */
 const deleteUser = asyncHandler(async (req, res) => {
-  const user = await User.findByIdAndDelete(req.params.id);
+  const userId = req.params.id;
+  const user = await User.findById(userId);
   
   if (!user) {
-    throw new ApiError(404, 'User not found');
+    throw new ApiError(404, 'Utilisateur non trouvé');
   }
 
-  res.send({ message: 'User deleted successfully' });
+  // Prevent admin from deleting themselves if they want
+  if (req.user._id.toString() === userId) {
+    throw new ApiError(400, 'Vous ne pouvez pas supprimer votre propre compte administrateur depuis cette interface');
+  }
+
+  console.log(`Performing permanent hard delete for user: ${userId} (${user.role})`);
+
+  try {
+    // 1. If owner, delete all their properties
+    if (user.role === 'owner') {
+      const userProperties = await Property.find({ owner: userId });
+      const propertyIds = userProperties.map(p => p._id);
+      
+      // Delete properties
+      await Property.deleteMany({ owner: userId });
+      
+      // Delete rental requests related to those properties
+      await RentalRequest.deleteMany({ property: { $in: propertyIds } });
+      
+      // Delete contracts related to those properties
+      await Contract.deleteMany({ property: { $in: propertyIds } });
+    }
+
+    // 2. If tenant, delete their rental requests
+    if (user.role === 'tenant') {
+      await RentalRequest.deleteMany({ tenant: userId });
+      await Contract.deleteMany({ tenant: userId });
+    }
+
+    // 3. Delete common user-linked data
+    await Promise.all([
+      HousingNeed.deleteMany({ user: userId }),
+      Notification.deleteMany({ user: userId }),
+      Message.deleteMany({ $or: [{ sender: userId }, { receiver: userId }] }),
+      Conversation.deleteMany({ participants: userId }),
+      FurnitureChangeRequest.deleteMany({ $or: [{ requester: userId }, { owner: userId }] }),
+      FurnitureOrder.deleteMany({ tenant: userId })
+    ]);
+
+    // 4. Finally, delete the user record permanently
+    await User.findByIdAndDelete(userId);
+
+    res.send({ 
+      message: 'Utilisateur et toutes ses données associées ont été supprimés définitivement du système',
+      deletedId: userId
+    });
+  } catch (error) {
+    console.error('Error during hard delete:', error);
+    throw new ApiError(500, 'Une erreur est survenue lors de la suppression permanente des données');
+  }
 });
 
 module.exports = {
