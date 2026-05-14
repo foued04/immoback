@@ -59,7 +59,7 @@ const getProperties = asyncHandler(async (req, res) => {
       
       const enhancedProperty = {
         ...propertyObject,
-        ownerName: ownerInfo.fullName || 'Propriétaire',
+        ownerName: ownerInfo.fullName || 'Locateur',
         ownerPhone: ownerInfo.phone || '-',
         ownerEmail: ownerInfo.email || '-',
       };

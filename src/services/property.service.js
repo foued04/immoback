@@ -7,6 +7,7 @@ const pickAllowedPropertyFields = (payload = {}) => {
     'title',
     'description',
     'city',
+    'department',
     'address',
     'rent',
     'deposit',
@@ -14,6 +15,7 @@ const pickAllowedPropertyFields = (payload = {}) => {
     'surface',
     'bedrooms',
     'bathrooms',
+    'livingRooms',
     'equippedKitchen',
     'balcony',
     'parking',
@@ -24,6 +26,8 @@ const pickAllowedPropertyFields = (payload = {}) => {
     'images',
     'furnishing',
     'meuble',
+    'lat',
+    'lng',
   ];
 
   return allowedFields.reduce((result, field) => {

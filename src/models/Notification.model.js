@@ -8,7 +8,7 @@ const NOTIFICATION_TYPES = [
   'Mobilier',
 ];
 
-const NOTIFICATION_STATUSES = ['Vue par le proprietaire', 'En attente'];
+const NOTIFICATION_STATUSES = ['Vue par le proprietaire', 'En attente', 'En cours', 'Resolue', 'Refusee'];
 
 const NotificationSchema = new mongoose.Schema({
   recipient: {
@@ -107,6 +107,11 @@ const NotificationSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   }
+}, {
+  timestamps: true
 });
+
+NotificationSchema.index({ recipient: 1, isRead: 1 });
+NotificationSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.model('Notification', NotificationSchema);

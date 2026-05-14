@@ -16,6 +16,7 @@ const propertySchema = new mongoose.Schema({
   surface: { type: Number, required: true },
   bedrooms: { type: Number, required: true },
   bathrooms: { type: Number, required: true },
+  livingRooms: { type: Number, default: 0 },
   equippedKitchen: { type: Boolean, default: false },
   balcony: { type: Boolean, default: false },
   parking: { type: Boolean, default: false },
